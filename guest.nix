@@ -227,9 +227,18 @@ in {
         jaq
         python3
         ripgrep
+        # Terminfo for whatever terminal the human ssh'd in from. ncurses'
+        # own database is already in the system path and covers alacritty,
+        # contour, foot, ghostty, rio, wezterm, st and the xterm/screen/tmux
+        # families; kitty's entry is the one in common use that it lacks.
+        # Deliberately not `environment.enableAllTerminfo`: that installs the
+        # `.terminfo` *output* of a dozen terminal emulators, so each one has
+        # to build, and any single failure takes system-path — and with it
+        # the whole box — down. nixos-unstable's contour and rxvt-unicode do
+        # not compile against gcc 16 today, which is exactly that.
+        kitty.terminfo
       ];
       variables.DISPLAY = ":99";
-      enableAllTerminfo = true;
     };
     documentation.enable = false;
 
