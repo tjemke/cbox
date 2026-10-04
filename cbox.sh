@@ -240,8 +240,17 @@ cmd_run() {
   FSD_PID=$!
 
   # No inbound forwards (passt's default), no host-loopback mapping, IPv4 only.
-  passt --foreground --quiet --one-off --ipv4-only --socket "$RUN/passt.sock" \
-    --no-map-gw --dns-forward 169.254.1.1 --dns 169.254.1.1 \
+  # --dns-forward makes 169.254.1.1 (the guest's only nameserver) the address
+  # passt matches DNS on; the resolver it forwards *to* is --dns-host, which
+  # defaults to the first nameserver in the host's /etc/resolv.conf. Do not add
+  # `--dns ADDR` here: it sets ip4.dns[0], which makes passt's get_dns() skip
+  # every `nameserver` line, leaving --dns-host unset (0.0.0.0) and silently
+  # NATing all guest DNS to the host's own 127.0.0.1:53. See NOTES.md.
+  # --search none keeps the host's internal search domains out of the box.
+  # Not --quiet: passt's startup config goes to passt.log, which is cheap and
+  # the only record of what the box's network actually looked like.
+  passt --foreground --one-off --ipv4-only --socket "$RUN/passt.sock" \
+    --no-map-gw --dns-forward 169.254.1.1 --search none \
     >"$RUN/passt.log" 2>&1 &
   NET_PID=$!
 

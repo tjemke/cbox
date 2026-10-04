@@ -58,6 +58,12 @@ IPv4 only. Private/LAN ranges are rejected by nftables inside the guest, where
 the agent has no root. That part is defence in depth, not a host-enforced
 boundary.
 
+DNS is the exception to the LAN rule. Queries to 169.254.1.1 are forwarded by
+passt, on the host, to the host's own first resolver — so if that resolver is a
+LAN or corporate one, the box resolves internal names and can use DNS as a
+side channel even without `--lan`. The guest's nftables sees only the
+169.254.1.1 destination and cannot filter on where it lands.
+
 Secrets: the token travels as a QEMU fw_cfg file, never in argv, and ends up
 in the guest's environment. The agent can read it. Revoke it if a session
 worries you.
@@ -83,3 +89,11 @@ Evaluated, not booted: the whole closure instantiates for x86_64 and aarch64
 against nixos-unstable, the host module evaluates, and `cbox.sh` passes
 shellcheck. No KVM was available to boot it. If the first boot misbehaves,
 run with `--keep` and read `console.log`, `virtiofsd.log` and `passt.log`.
+
+`NOTES.md` has the findings from debugging the first real session — a passt DNS
+misconfiguration that sent every guest lookup to the host's `127.0.0.1:53` — plus
+the passt DNS model and the caveats found along the way. Read it before touching
+the `passt` invocation. That one is fixed and the fix is confirmed:
+`test/passt-dns/probe.sh` exercises passt's DNS path with a fake guest over its
+qemu socket, so it needs neither KVM nor root, and `./probe.sh repro` reproduces
+the original `ENOTIMP` end to end.
