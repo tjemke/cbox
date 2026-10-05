@@ -24,7 +24,9 @@
     exec bash -lc 'exec "$@"' cbox-enter "$@"
   '';
 
-  agentNotes = pkgs.writeText "cbox-CLAUDE.md" ''
+  # ~/.claude/CLAUDE.md: what's always true of a box, then what depends on
+  # its options.
+  baseNotes = ''
     # You are inside a cbox
 
     This is a disposable NixOS microVM. It is destroyed when the session ends;
@@ -41,6 +43,14 @@
     - Git: if /work/.git is read-only you cannot commit. Leave your changes in
       the working tree for the human to review and commit.
   '';
+  sandboxNotes = ''
+    - Nix builds here are not sandboxed: they can see the whole filesystem
+      and the network. A derivation that builds here may still be impure;
+      say so rather than claiming it is reproducible.
+  '';
+  agentNotes = pkgs.writeText "cbox-CLAUDE.md" (
+    baseNotes + lib.optionalString (!cfg.nixSandbox) sandboxNotes
+  );
 in {
   options.cbox = {
     claudeDefaultMode = lib.mkOption {
@@ -49,6 +59,18 @@ in {
       description = ''
         `permissions.defaultMode` seeded into the guest's ~/.claude/settings.json.
         Claude Code only honours "auto" from user settings. null leaves it unset.
+      '';
+    };
+    nixSandbox = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Run in-box Nix builds in Nix's build sandbox. The sandbox is built on
+        user namespaces, so this also allows them for every guest user, and
+        with them the "root in a namespace" foothold most kernel LPE chains
+        start from. Off, builds run as plain nixbld users with the guest's
+        filesystem and network in view: impure, but no more privileged than
+        the agent, which can already run any code as itself.
       '';
     };
     display = lib.mkOption {
@@ -147,6 +169,25 @@ in {
       };
     };
     security.sudo.enable = false;
+    # The agent has no root/wheel, but unprivileged user namespaces are a
+    # default-on Linux feature independent of that: any uid can CLONE_NEWUSER
+    # into a namespace where it's "root" with a full capability set, which is
+    # the precondition nearly every recent kernel LPE/sandbox-escape chain
+    # needs (e.g. it's enough to mount overlayfs unprivileged, CVE-2023-0386's
+    # vector). This sets user.max_user_namespaces = 0, which binds root too,
+    # so nix-daemon's build sandbox (one user namespace per build) goes with
+    # it; the two are one decision, made by cbox.nixSandbox.
+    security.allowUserNamespaces = cfg.nixSandbox;
+    nix.settings.sandbox = cfg.nixSandbox;
+
+    # vhost-vsock/vsock are host<->hypervisor acceleration knobs; nothing in
+    # the guest needs the device nodes themselves (sshd uses the AF_VSOCK
+    # socket API, not these chardevs). Default udev perms leave them
+    # world-writable, so take that back.
+    services.udev.extraRules = ''
+      KERNEL=="vsock", MODE="0600", OWNER="root", GROUP="root"
+      KERNEL=="vhost-vsock", MODE="0600", OWNER="root", GROUP="root"
+    '';
 
     services.openssh = {
       enable = true;

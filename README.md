@@ -68,6 +68,14 @@ Secrets: the token travels as a QEMU fw_cfg file, never in argv, and ends up
 in the guest's environment. The agent can read it. Revoke it if a session
 worries you.
 
+Kernel: unprivileged user namespaces are off in the guest, since "root in a
+namespace" is where most kernel privilege escalations start. Nix's build
+sandbox needs them, so in-box `nix build`s run unsandboxed: impure, but as
+`nixbld` users with no more access than the agent. `cbox.nixSandbox = true`
+turns both back on. Root in the guest would undo the guest-side protections
+(`--git ro`, the LAN block), so this leans towards the smaller kernel
+surface.
+
 ## The shared directory is the attack surface
 
 Anything on the host that executes content from the shared directory is a way
