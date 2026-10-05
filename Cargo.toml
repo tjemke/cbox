@@ -1,0 +1,19 @@
+[package]
+name = "cbox"
+version = "0.1.0"
+edition = "2021"
+description = "Ephemeral NixOS microVMs for coding agents, with a headed browser"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+libc = "0.2"
+signal-hook = "0.3"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+# Not panic = "abort": a panic must still unwind, or Session::drop never runs
+# and the box outlives the process.

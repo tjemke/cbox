@@ -291,7 +291,7 @@ Four rules that cover most of the footguns:
 - A boot-time DNS smoke test in `cbox-setup` would have caught this class of bug
   immediately, and `cbox-setup` already fails closed. Not added: it would make
   booting a box depend on working egress, which is the wrong trade for a tool
-  you might want offline. A non-fatal warning printed by `cbox.sh` after the
+  you might want offline. A non-fatal warning printed by `cbox` after the
   ready-wait would be the better version if someone wants it.
 
 ### Bun vs Node, in the guest

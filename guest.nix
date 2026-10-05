@@ -1,5 +1,5 @@
 # The box itself. Everything a session varies (project dir, keys, env, git
-# mode, LAN policy, vsock CID) arrives at runtime from cbox.sh; nothing here
+# mode, LAN policy, vsock CID) arrives at runtime from cbox; nothing here
 # depends on it, so the store image is built once and reused.
 {
   config,
@@ -9,7 +9,7 @@
 }: let
   cfg = config.cbox;
 
-  # QEMU fw_cfg entries written by cbox.sh (see microvm.extraArgsScript below).
+  # QEMU fw_cfg entries written by cbox (see microvm.extraArgsScript below).
   fwcfg = "/sys/firmware/qemu_fw_cfg/by_name/opt/cbox";
 
   cbox-enter = pkgs.writeShellScriptBin "cbox-enter" ''
@@ -76,7 +76,7 @@ in {
       # without a /nix/store share), not a view of the host store.
       writableStoreOverlay = "/nix/.rw-store";
 
-      # Relative paths resolve against cbox.sh's per-session directory, where
+      # Relative paths resolve against cbox's per-session directory, where
       # `disk` is a symlink into ~/.cache/cbox/<id>. Sparse; deleted on exit.
       volumes = [
         {
@@ -95,7 +95,7 @@ in {
         }
       ];
 
-      # cbox.sh runs its own unprivileged virtiofsd on this relative socket;
+      # cbox runs its own unprivileged virtiofsd on this relative socket;
       # `source` is only used by microvm.nix's root virtiofsd launcher, which
       # cbox doesn't use.
       shares = [
@@ -108,7 +108,7 @@ in {
         }
       ];
 
-      # passt (started by cbox.sh) instead of QEMU's SLIRP, which maps
+      # passt (started by cbox) instead of QEMU's SLIRP, which maps
       # 10.0.2.2 to the host's loopback services.
       qemu.extraArgs = [
         "-netdev"
@@ -142,7 +142,7 @@ in {
       users.root.hashedPassword = "!";
       users.agent = {
         isNormalUser = true;
-        uid = 1000; # cbox.sh's virtiofsd shows host-owned files as 1000:100
+        uid = 1000; # cbox's virtiofsd shows host-owned files as 1000:100
         group = "users";
       };
     };
@@ -268,7 +268,7 @@ in {
         };
       };
 
-      # Applies the session's settings, then touches /run/cbox/ready. cbox.sh
+      # Applies the session's settings, then touches /run/cbox/ready. cbox
       # waits for that file before starting the agent, so a failure here
       # fails closed: the session never starts.
       cbox-setup = {

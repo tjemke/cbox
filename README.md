@@ -86,9 +86,11 @@ out.
 ## Status
 
 Evaluated, not booted: the whole closure instantiates for x86_64 and aarch64
-against nixos-unstable, the host module evaluates, and `cbox.sh` passes
-shellcheck. No KVM was available to boot it. If the first boot misbehaves,
-run with `--keep` and read `console.log`, `virtiofsd.log` and `passt.log`.
+against nixos-unstable, the host module evaluates, and the host CLI (`src/`,
+Rust + clap) builds clean under `cargo clippy -- -D warnings` with its unit
+tests passing. No KVM was available to boot a real guest. If the first boot
+misbehaves, run with `--keep` and read `console.log`, `virtiofsd.log` and
+`passt.log`.
 
 `NOTES.md` has the findings from debugging the first real session — a passt DNS
 misconfiguration that sent every guest lookup to the host's `127.0.0.1:53` — plus
