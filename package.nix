@@ -9,6 +9,7 @@
   tigervnc,
   virtiofsd,
   guest,
+  guestNixpkgsDate ? null,
 }: let
   runner = guest.config.microvm.declaredRunner;
 in
@@ -36,6 +37,7 @@ in
     postInstall = ''
       wrapProgram $out/bin/cbox \
         --set CBOX_RUNNER ${lib.escapeShellArg runner} \
+        ${lib.optionalString (guestNixpkgsDate != null) "--set CBOX_GUEST_NIXPKGS_DATE ${guestNixpkgsDate}"} \
         --prefix PATH : ${lib.makeBinPath [openssh passt socat tigervnc virtiofsd]}
     '';
 

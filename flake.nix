@@ -19,9 +19,16 @@
     mkCbox = {
       pkgs,
       modules ? [],
+      # The nixpkgs tree the guest is built from, and the day it was cut
+      # (YYYYMMDD, or null if unknown), which `cbox run` warns about once it
+      # is old. Default: cbox's own pin. The NixOS module passes the host's.
+      guestNixpkgs ? nixpkgs.outPath,
+      guestNixpkgsDate ? builtins.substring 0 8 nixpkgs.lastModifiedDate,
     }:
       pkgs.callPackage ./package.nix {
-        guest = nixpkgs.lib.nixosSystem {
+        inherit guestNixpkgsDate;
+        guest = import (guestNixpkgs + "/nixos/lib/eval-config.nix") {
+          system = null; # from nixpkgs.hostPlatform below
           modules =
             [
               microvm.nixosModules.microvm

@@ -14,6 +14,8 @@ use std::time::{Duration, Instant};
 use std::{env, fs};
 
 use anyhow::{bail, Context, Result};
+use jiff::civil::Date;
+use jiff::Zoned;
 
 use crate::proc::{exit_code, interrupted, spawn_logged, wait_foreground};
 use crate::session::{self, Session};
@@ -23,6 +25,7 @@ use crate::{cred, GitMode, RunArgs};
 
 pub fn run(a: RunArgs) -> Result<ExitCode> {
     let runner = session::runner()?;
+    warn_if_stale();
 
     let mut pass_env = vec![
         "CLAUDE_CODE_OAUTH_TOKEN".to_string(),
@@ -68,6 +71,32 @@ pub fn run(a: RunArgs) -> Result<ExitCode> {
     let status = wait_foreground(ssh.spawn().context("starting ssh")?)?;
     Ok(exit_code(status))
     // Returning drops `sess`, which shuts the box down and removes it.
+}
+
+/// After about a month a nixpkgs has usually missed a Nix daemon or kernel
+/// security fix, and those are what stand between the agent and guest root.
+const STALE_AFTER_DAYS: i32 = 30;
+
+/// The Nix wrapper records the day the guest's nixpkgs was cut, when it knows.
+/// Only a warning: an old box still works, it is just easier to break out of.
+fn warn_if_stale() {
+    let Ok(stamp) = env::var("CBOX_GUEST_NIXPKGS_DATE") else {
+        return;
+    };
+    let Some((cut, age)) = age_in_days(&stamp, Zoned::now().date()) else {
+        return;
+    };
+    if age > STALE_AFTER_DAYS {
+        eprintln!("cbox: this box's nixpkgs is from {cut}, {age} days ago; its Nix daemon,");
+        eprintln!("      kernel and claude-code lack every fix since. Update the nixpkgs input");
+        eprintln!("      it is built from and rebuild (see programs.cbox.guestNixpkgs).");
+    }
+}
+
+/// The day a YYYYMMDD stamp names, and how many days before `today` it was.
+fn age_in_days(stamp: &str, today: Date) -> Option<(Date, i32)> {
+    let cut = Date::strptime("%Y%m%d", stamp).ok()?;
+    Some((cut, cut.until(today).ok()?.get_days()))
 }
 
 /// The host directory to share, resolved and vetted.
@@ -266,6 +295,27 @@ fn wait_until_ready(run: &Path, qemu: &mut Child) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn age_is_counted_in_calendar_days() {
+        let today = jiff::civil::date(2026, 10, 10);
+        let age = |stamp| age_in_days(stamp, today).map(|(_, days)| days);
+        assert_eq!(age("20261010"), Some(0));
+        assert_eq!(age("20260910"), Some(30));
+        assert_eq!(age("20260801"), Some(70));
+        assert_eq!(age("20240229"), Some(954));
+        assert_eq!(age("20261011"), Some(-1)); // a host clock that's behind
+        for bad in [
+            "",
+            "garbage",
+            "2026-10-03",
+            "20261303",
+            "20260230",
+            "2026100x",
+        ] {
+            assert_eq!(age(bad), None, "{bad:?}");
+        }
+    }
 
     #[test]
     fn only_an_explicit_yes_confirms() {
