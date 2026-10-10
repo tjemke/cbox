@@ -41,6 +41,12 @@ Inside, `nix develop` works (the guest has a writable store overlay on a
 scratch disk), downloaded Linux binaries run via nix-ld, and
 `~/.claude/CLAUDE.md` tells the agent all of this.
 
+[rtk](https://github.com/rtk-ai/rtk) is installed with its Claude Code hook,
+so Bash output (git, cargo, test runners, grep, …) is condensed before it
+reaches the agent's context. `rtk gain` inside the box shows the savings. The
+hook only rewrites commands and never approves them, so auto mode's checks are
+unchanged. Turn it off with `cbox.rtk.enable = false;` in a guest module.
+
 Options: `--git rw` (let the agent commit, see below), `--lan` (allow private
 addresses), `--env NAME` (pass another host variable), `--keep` (keep the
 session dir and logs in `$XDG_RUNTIME_DIR/cbox/<id>` for debugging).

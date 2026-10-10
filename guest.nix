@@ -49,8 +49,40 @@
       say so rather than claiming it is reproducible.
   '';
   agentNotes = pkgs.writeText "cbox-CLAUDE.md" (
-    baseNotes + lib.optionalString (!cfg.nixSandbox) sandboxNotes
+    baseNotes
+    + lib.optionalString (!cfg.nixSandbox) sandboxNotes
+    + lib.optionalString cfg.rtk.enable "\n@RTK.md\n"
   );
+
+  # rtk's own agent instructions for this rtk version, taken from what
+  # `rtk init -g` would write, so they can't drift from the binary.
+  rtkNotes = pkgs.runCommand "cbox-RTK.md" {} ''
+    export HOME=$TMPDIR
+    mkdir "$HOME/.claude"
+    ${lib.getExe cfg.rtk.package} init -g --auto-patch > /dev/null
+    cp "$HOME/.claude/RTK.md" "$out"
+  '';
+
+  claudeSettings =
+    lib.optionalAttrs (cfg.claudeDefaultMode != null) {
+      permissions.defaultMode = cfg.claudeDefaultMode;
+    }
+    // lib.optionalAttrs cfg.rtk.enable {
+      # Same hook `rtk init -g` registers, by store path. It only rewrites
+      # the command (`git status` -> `rtk git status`) and never returns a
+      # permission decision, so auto mode still judges every call.
+      hooks.PreToolUse = [
+        {
+          matcher = "Bash";
+          hooks = [
+            {
+              type = "command";
+              command = "${lib.getExe cfg.rtk.package} hook claude";
+            }
+          ];
+        }
+      ];
+    };
 in {
   options.cbox = {
     claudeDefaultMode = lib.mkOption {
@@ -72,6 +104,18 @@ in {
         filesystem and network in view: impure, but no more privileged than
         the agent, which can already run any code as itself.
       '';
+    };
+    rtk = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = ''
+          Install rtk and register its Claude Code hook, which condenses Bash
+          output (git, cargo, test runners, grep, ...) before it reaches the
+          agent's context.
+        '';
+      };
+      package = lib.mkPackageOption pkgs "rtk" {};
     };
     display = lib.mkOption {
       type = lib.types.str;
@@ -257,28 +301,30 @@ in {
     };
 
     environment = {
-      systemPackages = with pkgs; [
-        cbox-enter
-        chromium
-        claude-code
-        curl
-        fd
-        git
-        google-chrome
-        jaq
-        python3
-        ripgrep
-        # Terminfo for whatever terminal the human ssh'd in from. ncurses'
-        # own database is already in the system path and covers alacritty,
-        # contour, foot, ghostty, rio, wezterm, st and the xterm/screen/tmux
-        # families; kitty's entry is the one in common use that it lacks.
-        # Deliberately not `environment.enableAllTerminfo`: that installs the
-        # `.terminfo` *output* of a dozen terminal emulators, so each one has
-        # to build, and any single failure takes system-path — and with it
-        # the whole box — down. nixos-unstable's contour and rxvt-unicode do
-        # not compile against gcc 16 today, which is exactly that.
-        kitty.terminfo
-      ];
+      systemPackages = with pkgs;
+        [
+          cbox-enter
+          chromium
+          claude-code
+          curl
+          fd
+          git
+          google-chrome
+          jaq
+          python3
+          ripgrep
+          # Terminfo for whatever terminal the human ssh'd in from. ncurses'
+          # own database is already in the system path and covers alacritty,
+          # contour, foot, ghostty, rio, wezterm, st and the xterm/screen/tmux
+          # families; kitty's entry is the one in common use that it lacks.
+          # Deliberately not `environment.enableAllTerminfo`: that installs the
+          # `.terminfo` *output* of a dozen terminal emulators, so each one has
+          # to build, and any single failure takes system-path — and with it
+          # the whole box — down. nixos-unstable's contour and rxvt-unicode do
+          # not compile against gcc 16 today, which is exactly that.
+          kitty.terminfo
+        ]
+        ++ lib.optional cfg.rtk.enable cfg.rtk.package;
       variables.DISPLAY = ":99";
     };
     documentation.enable = false;
@@ -371,11 +417,12 @@ in {
         group = "users";
       };
       "/home/agent/.claude/CLAUDE.md"."L+".argument = "${agentNotes}";
-      "/home/agent/.claude/settings.json".f = lib.mkIf (cfg.claudeDefaultMode != null) {
+      "/home/agent/.claude/RTK.md" = lib.mkIf cfg.rtk.enable {"L+".argument = "${rtkNotes}";};
+      "/home/agent/.claude/settings.json".f = lib.mkIf (claudeSettings != {}) {
         mode = "0600";
         user = "agent";
         group = "users";
-        argument = builtins.toJSON {permissions.defaultMode = cfg.claudeDefaultMode;};
+        argument = builtins.toJSON claudeSettings;
       };
       # Best effort: skips first-run onboarding and the /work trust prompt.
       "/home/agent/.claude.json".f = {
