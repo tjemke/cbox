@@ -91,7 +91,8 @@ out.
   on the host. Default `--git ro` makes `/work/.git` a read-only mount point
   that can't be written, renamed or replaced. `--git rw` has no guards: they are
   whack-a-mole (`.git/commondir` alone redirects where config is read from), so
-  only use it for tasks you'd trust on the host.
+  only use it for tasks you'd trust on the host. cbox says so and asks before
+  booting; `--yes` skips the question, and without a terminal it is required.
 - Submodules: their working trees are writable, and host `git status` reads
   their `.git`. cbox warns and suggests `git -c diff.ignoreSubmodules=all status`.
 - Anything else you run from the tree afterwards: `nix develop`, npm scripts,

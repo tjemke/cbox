@@ -5,6 +5,7 @@
 //! sockets immediately; `cred/` has to be written before that, because QEMU
 //! reads those files into fw_cfg as it boots.
 
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::os::unix::fs::FileTypeExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitCode, Stdio};
@@ -17,7 +18,7 @@ use anyhow::{bail, Context, Result};
 use crate::proc::{exit_code, interrupted, spawn_logged, wait_foreground};
 use crate::session::{self, Session};
 use crate::ssh;
-use crate::sys::{accessible, opt, uid_gid, whoami};
+use crate::sys::{accessible, opt, readable, uid_gid, whoami};
 use crate::{cred, GitMode, RunArgs};
 
 pub fn run(a: RunArgs) -> Result<ExitCode> {
@@ -44,6 +45,9 @@ pub fn run(a: RunArgs) -> Result<ExitCode> {
 
     let dir = share_target(a.dir)?;
     warn_about_git(&dir, a.git);
+    if a.git == GitMode::Rw && !a.yes {
+        confirm_git_rw()?;
+    }
 
     let id = session::id_for(&dir)?;
     let mut sess = Session::create(&id, &dir, runner.clone(), a.keep)?;
@@ -88,13 +92,17 @@ fn share_target(requested: Option<PathBuf>) -> Result<PathBuf> {
 }
 
 /// Both of these are about what the *host* will execute out of the tree later.
-/// Neither stops the session, because neither is cbox's call to make.
+/// Neither stops the session on its own: --git rw is the user's call, which
+/// [`confirm_git_rw`] makes them take explicitly.
 fn warn_about_git(dir: &Path, git: GitMode) {
     if git == GitMode::Rw {
         eprintln!(
-            "cbox: --git rw: review .git before running host git in {} afterwards",
+            "cbox: --git rw lets the agent write {}/.git, and host git runs",
             dir.display()
         );
+        eprintln!("      what it finds there: hooks, core.fsmonitor on every \"git status\",");
+        eprintln!("      config pulled in through commondir. Review .git before you run git");
+        eprintln!("      in this directory afterwards.");
     } else if dir.join(".gitmodules").is_file() {
         eprintln!(
             "cbox: {} has submodules; their working trees are agent-writable, and host git",
@@ -105,6 +113,34 @@ fn warn_about_git(dir: &Path, git: GitMode) {
              Afterwards use: git -c diff.ignoreSubmodules=all status"
         );
     }
+}
+
+/// Ask on the terminal; without one there is nobody to ask, so refuse rather
+/// than assume. The prompt is the one place cbox reads stdin, so it polls
+/// instead of blocking: a signal there has no foreground child to cut short.
+fn confirm_git_rw() -> Result<()> {
+    let stdin = io::stdin();
+    if !stdin.is_terminal() {
+        bail!("--git rw needs confirmation and stdin is not a terminal; pass --yes");
+    }
+    eprint!("cbox: start with a writable .git? [y/N] ");
+    io::stderr().flush()?;
+    while !readable(libc::STDIN_FILENO, 100)? {
+        if interrupted() {
+            eprintln!();
+            bail!("interrupted");
+        }
+    }
+    let mut answer = String::new();
+    stdin.lock().read_line(&mut answer)?;
+    if !is_yes(&answer) {
+        bail!("not starting: --git rw was not confirmed");
+    }
+    Ok(())
+}
+
+fn is_yes(answer: &str) -> bool {
+    matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
 /// virtiofsd and passt, and the wait for each to be listening.
@@ -224,5 +260,21 @@ fn wait_until_ready(run: &Path, qemu: &mut Child) -> Result<()> {
             ));
         }
         sleep(Duration::from_secs(1));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_an_explicit_yes_confirms() {
+        for yes in ["y\n", "Y\n", "yes\n", " YES \n"] {
+            assert!(is_yes(yes), "{yes:?}");
+        }
+        // EOF (Ctrl-D) reads as "", and Enter alone takes the default.
+        for no in ["", "\n", "n\n", "no\n", "yess\n", "y es\n"] {
+            assert!(!is_yes(no), "{no:?}");
+        }
     }
 }

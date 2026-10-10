@@ -82,9 +82,13 @@ struct RunArgs {
     ///
     /// ro (default): /work/.git is read-only in the box, so no commits.
     /// rw: the agent can commit, and host git will then run whatever it wrote
-    /// into .git (hooks, config, commondir). Trusted tasks only.
+    /// into .git (hooks, config, commondir). Trusted tasks only; asks first.
     #[arg(long, value_name = "MODE", default_value = "ro")]
     git: GitMode,
+
+    /// Don't ask before starting with --git rw (needed without a terminal)
+    #[arg(short, long)]
+    yes: bool,
 
     /// Allow private/LAN destinations (default: blocked inside the guest)
     #[arg(long)]
@@ -186,6 +190,7 @@ mod tests {
         assert_eq!(a.dir.as_deref(), Some(Path::new("/src/thing")));
         assert_eq!(a.cmd, ["claude", "-p"]);
         assert_eq!(a.git, GitMode::Ro);
+        assert!(!a.yes);
     }
 
     #[test]

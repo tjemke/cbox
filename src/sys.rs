@@ -58,3 +58,25 @@ pub fn opt(prefix: &str, value: impl AsRef<OsStr>) -> OsString {
     o.push(value);
     o
 }
+
+/// `poll(2)` on one fd for input, for at most `timeout_ms`. A signal landing
+/// mid-poll counts as "not yet", so the caller's loop gets to check for it.
+pub fn readable(fd: libc::c_int, timeout_ms: libc::c_int) -> Result<bool> {
+    let mut p = libc::pollfd {
+        fd,
+        events: libc::POLLIN,
+        revents: 0,
+    };
+    match unsafe { libc::poll(&mut p, 1, timeout_ms) } {
+        n if n > 0 => Ok(true),
+        0 => Ok(false),
+        _ => {
+            let e = std::io::Error::last_os_error();
+            if e.kind() == std::io::ErrorKind::Interrupted {
+                Ok(false)
+            } else {
+                Err(e).context("poll")
+            }
+        }
+    }
+}
