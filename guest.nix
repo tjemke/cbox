@@ -41,7 +41,17 @@
     - Network: public internet only. The host and private/LAN addresses are
       unreachable unless the session was started with --lan.
     - Git: if /work/.git is read-only you cannot commit. Leave your changes in
-      the working tree for the human to review and commit.
+      the working tree for the human to review and commit. If you are asked to
+      commit anyway, write /work/commit-plan.sh for the human to run on the
+      host, splitting and wording the commits as the repo's AGENTS.md or
+      similar asks. If an older plan is there and its commits aren't in
+      `git log` yet, ask before replacing it. The script pins the base commit
+      and carries each commit's patch and message inline, in quoted heredocs.
+      It replays them all on a scratch index (GIT_INDEX_FILE) and commits
+      nothing unless that matches the working tree, then runs
+      `git apply --cached` and `git commit -F` for each: index and HEAD only,
+      never the working tree. Test it on a `git clone /work` first. The human
+      runs it on their host, so keep it plain enough to read.
   '';
   graphicsNotes = ''
     - OpenGL, EGL and Vulkan work on the display, rendered on the CPU by

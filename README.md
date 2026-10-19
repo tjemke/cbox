@@ -117,6 +117,11 @@ out.
   whack-a-mole (`.git/commondir` alone redirects where config is read from), so
   only use it for tasks you'd trust on the host. cbox says so and asks before
   booting; `--yes` skips the question, and without a terminal it is required.
+- Commit plans: with `--git ro`, an agent asked to commit writes
+  `commit-plan.sh` instead. It replays the agent's commits onto your index and
+  HEAD after checking that they add up to the working tree. It is agent-written
+  code for you to run on the host, so read it first; `git status` and
+  `git diff` show what the commits will add up to.
 - Submodules: their working trees are writable, and host `git status` reads
   their `.git`. cbox warns and suggests `git -c diff.ignoreSubmodules=all status`.
 - Anything else you run from the tree afterwards: `nix develop`, npm scripts,
