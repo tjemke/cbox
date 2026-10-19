@@ -48,6 +48,10 @@
       Mesa (llvmpipe, lavapipe). There is no GPU, so heavy 3D is slow.
       Chrome blocklists llvmpipe: pass `--ignore-gpu-blocklist` for WebGL.
   '';
+  kvmNotes = ''
+    - /dev/kvm is available: you can run hardware-accelerated VMs (NixOS VM
+      tests, emulators) where the host allows nested virtualization.
+  '';
   sandboxNotes = ''
     - Nix builds here are not sandboxed: they can see the whole filesystem
       and the network. A derivation that builds here may still be impure;
@@ -56,6 +60,7 @@
   agentNotes = pkgs.writeText "cbox-CLAUDE.md" (
     baseNotes
     + lib.optionalString config.hardware.graphics.enable graphicsNotes
+    + lib.optionalString cfg.kvm kvmNotes
     + lib.optionalString (!cfg.nixSandbox) sandboxNotes
     + lib.optionalString cfg.rtk.enable "\n@RTK.md\n"
   );
@@ -109,6 +114,19 @@ in {
         start from. Off, builds run as plain nixbld users with the guest's
         filesystem and network in view: impure, but no more privileged than
         the agent, which can already run any code as itself.
+      '';
+    };
+    kvm = lib.mkOption {
+      type = lib.types.bool;
+      default = false;
+      description = ''
+        Let the agent use /dev/kvm inside the box, for hardware-accelerated
+        VMs (NixOS VM tests, emulators) where the host allows nested
+        virtualization. Off by default: the node is locked to root, keeping
+        the guest kernel's virtualization paths out of the unprivileged
+        agent's reach — the same kind of surface the user-namespace lockdown
+        closes. The box itself always runs under the host's KVM regardless;
+        this only governs VMs started inside it.
       '';
     };
     rtk = {
@@ -230,13 +248,29 @@ in {
     security.allowUserNamespaces = cfg.nixSandbox;
     nix.settings.sandbox = cfg.nixSandbox;
 
-    # vhost-vsock/vsock are host<->hypervisor acceleration knobs; nothing in
-    # the guest needs the device nodes themselves (sshd uses the AF_VSOCK
-    # socket API, not these chardevs). Default udev perms leave them
-    # world-writable, so take that back.
+    # These char devices front the host<->hypervisor and in-guest
+    # virtualization paths; nothing the guest runs needs them (sshd uses the
+    # AF_VSOCK socket API, not /dev/vsock, and the vhost/kvm nodes only matter
+    # for running VMs *inside* the box). Left at systemd's defaults they are
+    # world-accessible, which would put the guest kernel's virtualization code
+    # within reach of the unprivileged agent — extra attack surface of the same
+    # kind the user-namespace lockdown closes. So lock them to root.
+    #
+    # vhost-vsock/vhost-net have no live device at boot — their modules load on
+    # first open — so the node sitting there at boot is the *static* node
+    # created from systemd's default rule, which is world-writable. A rule
+    # without OPTIONS+="static_node=..." only matches a later real uevent, so
+    # that option is what makes these apply to the static node and not leave a
+    # window open before the module ever loads.
     services.udev.extraRules = ''
-      KERNEL=="vsock", MODE="0600", OWNER="root", GROUP="root"
-      KERNEL=="vhost-vsock", MODE="0600", OWNER="root", GROUP="root"
+      KERNEL=="vsock", OWNER="root", GROUP="root", MODE="0600"
+      KERNEL=="vhost-vsock", OWNER="root", GROUP="root", MODE="0600", OPTIONS+="static_node=vhost-vsock"
+      KERNEL=="vhost-net", OWNER="root", GROUP="root", MODE="0600", OPTIONS+="static_node=vhost-net"
+      ${
+        if cfg.kvm
+        then ''KERNEL=="kvm", OWNER="root", GROUP="users", MODE="0660", OPTIONS+="static_node=kvm"''
+        else ''KERNEL=="kvm", OWNER="root", GROUP="root", MODE="0600", OPTIONS+="static_node=kvm"''
+      }
     '';
 
     services.openssh = {

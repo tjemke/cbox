@@ -98,6 +98,14 @@ turns both back on. Root in the guest would undo the guest-side protections
 (`--git ro`, the LAN block), so this leans towards the smaller kernel
 surface.
 
+In the same spirit, the guest's virtualization device nodes (`/dev/vhost-vsock`,
+`/dev/vhost-net`, `/dev/kvm`) are locked to root rather than left at systemd's
+world-accessible defaults: the box runs under the host's KVM, but nothing the
+guest itself runs needs these, and leaving them open would hand the agent more
+guest-kernel surface for no gain. Set `cbox.kvm = true;` in a guest module to
+give the agent `/dev/kvm` back, for running VM tests or emulators inside the box
+where the host allows nested virtualization.
+
 ## The shared directory is the attack surface
 
 Anything on the host that executes content from the shared directory is a way
