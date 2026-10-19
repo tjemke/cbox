@@ -43,6 +43,11 @@
     - Git: if /work/.git is read-only you cannot commit. Leave your changes in
       the working tree for the human to review and commit.
   '';
+  graphicsNotes = ''
+    - OpenGL, EGL and Vulkan work on the display, rendered on the CPU by
+      Mesa (llvmpipe, lavapipe). There is no GPU, so heavy 3D is slow.
+      Chrome blocklists llvmpipe: pass `--ignore-gpu-blocklist` for WebGL.
+  '';
   sandboxNotes = ''
     - Nix builds here are not sandboxed: they can see the whole filesystem
       and the network. A derivation that builds here may still be impure;
@@ -50,6 +55,7 @@
   '';
   agentNotes = pkgs.writeText "cbox-CLAUDE.md" (
     baseNotes
+    + lib.optionalString config.hardware.graphics.enable graphicsNotes
     + lib.optionalString (!cfg.nixSandbox) sandboxNotes
     + lib.optionalString cfg.rtk.enable "\n@RTK.md\n"
   );
@@ -291,6 +297,7 @@ in {
         dbus
         expat
         glib
+        libGL # libglvnd; it finds Mesa under /run/opengl-driver
         libx11
         libxcb
         nspr
@@ -328,6 +335,14 @@ in {
       variables.DISPLAY = ":99";
     };
     documentation.enable = false;
+
+    # Mesa at /run/opengl-driver, the one place Xvfb's GLX and libglvnd look
+    # for drivers. Without it Xvfb offers GLX with no visuals and EGL finds no
+    # vendor, so anything that draws with OpenGL fails on :99. Software only:
+    # llvmpipe for GL, lavapipe for Vulkan. A virtio-gpu/virgl device would
+    # be faster but hands the guest's GL stream to a renderer on the host.
+    # Mesa and its LLVM add about 800 MiB to the image.
+    hardware.graphics.enable = lib.mkDefault true;
 
     systemd.services = {
       cbox-xvfb = {

@@ -22,8 +22,8 @@ programs.cbox = {
 };
 ```
 
-The first build makes an erofs image of the guest closure (Chrome and
-Chromium included), so it takes a while and a few GB. Later sessions reuse it.
+The first build makes an erofs image of the guest closure (Chrome, Chromium
+and Mesa included), so it takes a while and a few GB. Later sessions reuse it.
 
 With the module, the guest is built from your system's own nixpkgs
 (`programs.cbox.guestNixpkgs = "host"`, the default), so every system update
@@ -55,6 +55,13 @@ so Bash output (git, cargo, test runners, grep, …) is condensed before it
 reaches the agent's context. `rtk gain` inside the box shows the savings. The
 hook only rewrites commands and never approves them, so auto mode's checks are
 unchanged. Turn it off with `cbox.rtk.enable = false;` in a guest module.
+
+The display has OpenGL, EGL and Vulkan, rendered on the CPU by Mesa's llvmpipe
+and lavapipe, so GUIs that need GL start there. Chrome blocklists llvmpipe and
+only uses it for WebGL with `--ignore-gpu-blocklist`. There is deliberately no
+virtio-gpu/virgl device: it would be faster, but it hands the guest's GL stream
+to a renderer on the host. Mesa and its LLVM add about 800 MiB to the image;
+`hardware.graphics.enable = false;` in a guest module drops them.
 
 Options: `--git rw` (let the agent commit, see below), `--lan` (allow private
 addresses), `--env NAME` (pass another host variable), `--keep` (keep the
