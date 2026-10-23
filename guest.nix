@@ -33,8 +33,9 @@
     only /work (the project directory shared from the host) survives.
 
     - No root, no sudo. Get tools with `nix shell nixpkgs#<pkg>` or the
-      project's `nix develop`. Prebuilt Linux binaries (npm/pip downloads)
-      run via nix-ld.
+      project's `nix develop`. `nixpkgs` is the tree this box was built from,
+      already on disk; `nixpkgs/nixpkgs-unstable#<pkg>` fetches the newest.
+      Prebuilt Linux binaries (npm/pip downloads) run via nix-ld.
     - A virtual display runs at DISPLAY=:99 (1920x1080). Headed browsers and
       Electron apps work there. Browsers on PATH: `chromium`,
       `google-chrome-stable`. The human may be watching over VNC.
@@ -352,6 +353,9 @@ in {
     };
 
     nix.settings.experimental-features = ["nix-command" "flakes"];
+    # No channels in a box; they'd only leave dead entries in NIX_PATH next to
+    # the nixpkgs=flake:nixpkgs one nixpkgs.flake.source adds.
+    nix.channel.enable = false;
     programs.nix-ld = {
       enable = true;
       libraries = with pkgs; [

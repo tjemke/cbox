@@ -56,7 +56,10 @@ cbox ls | stop ID | gc
 
 Inside, `nix develop` works (the guest has a writable store overlay on a
 scratch disk), downloaded Linux binaries run via nix-ld, and
-`~/.claude/CLAUDE.md` tells the agent all of this.
+`~/.claude/CLAUDE.md` tells the agent all of this. `nixpkgs#…` in the box is
+the nixpkgs the image was built from: its source is in the image (about 200 MB
+before compression), so it needs no download and matches what is installed.
+`nixpkgs/nixpkgs-unstable#…` still fetches the newest.
 
 [rtk](https://github.com/rtk-ai/rtk) is installed with its Claude Code hook,
 so Bash output (git, cargo, test runners, grep, …) is condensed before it

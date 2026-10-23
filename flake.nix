@@ -33,10 +33,21 @@
           then builtins.substring 0 8 guestNixpkgs.lastModifiedDate
           else null
         );
+      # The tree as a store path named "source", which nixpkgs.flake.source
+      # needs (NixOS/nix#7075) and a flake input already is. A path, such as a
+      # channel host's nixpkgs, is copied into one.
+      guestNixpkgsSource =
+        if builtins.isPath guestNixpkgs
+        then
+          builtins.path {
+            path = guestNixpkgs;
+            name = "source";
+          }
+        else toString guestNixpkgs;
     in
       pkgs.callPackage ./package.nix {
         inherit guestNixpkgsDate;
-        guest = import ((guestNixpkgs.outPath or guestNixpkgs) + "/nixos/lib/eval-config.nix") {
+        guest = import (guestNixpkgsSource + "/nixos/lib/eval-config.nix") {
           system = null; # from nixpkgs.hostPlatform below
           modules =
             [
@@ -48,6 +59,11 @@
                 # is the boundary the box rests on, so they come from the
                 # host's packages whatever the guest is built from.
                 microvm.vmHostPackages = pkgs;
+                # `nixpkgs` in the box's flake registry and NIX_PATH is this
+                # tree, which puts it in the image: nothing to fetch, and it
+                # matches what is installed. Refs such as
+                # nixpkgs/nixpkgs-unstable still resolve globally.
+                nixpkgs.flake.source = guestNixpkgsSource;
               }
             ]
             ++ image.modules or [];
