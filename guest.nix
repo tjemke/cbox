@@ -114,6 +114,12 @@ in {
         Claude Code only honours "auto" from user settings. null leaves it unset.
       '';
     };
+    claudeCode.package = lib.mkPackageOption pkgs "claude-code" {
+      extraDescription = ''
+        It moves fast and nixpkgs lags behind, so this is the one to take from
+        a newer nixpkgs without moving the rest of the box along.
+      '';
+    };
     nixSandbox = lib.mkOption {
       type = lib.types.bool;
       default = false;
@@ -367,7 +373,7 @@ in {
         [
           cbox-enter
           chromium
-          claude-code
+          cfg.claudeCode.package
           curl
           fd
           git

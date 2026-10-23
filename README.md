@@ -34,6 +34,10 @@ by then it has usually missed fixes for exactly what stands between the agent
 and guest root. The date comes from nixpkgs' flake; a channel-based host has
 none, and gets no warning.
 
+claude-code releases faster than nixpkgs follows. To run a newer one without
+moving the rest of the box, set `cbox.claudeCode.package` in a guest module,
+e.g. to the claude-code of a fresher nixpkgs input.
+
 ## Use
 
 ```sh
