@@ -161,11 +161,12 @@ in {
   config = {
     system.stateVersion = lib.trivial.release; # nothing persists, so no migration concerns
     networking.hostName = "cbox";
-    nixpkgs.config.allowUnfreePredicate = pkg:
-      builtins.elem (lib.getName pkg) [
-        "claude-code"
-        "google-chrome"
-      ];
+    # A list rather than allowUnfreePredicate: lists from several modules add
+    # up, so a guest module can allow one more without replacing these.
+    nixpkgs.config.allowUnfreePackages = [
+      "claude-code"
+      "google-chrome"
+    ];
 
     microvm = {
       hypervisor = "qemu"; # only runner here with fw_cfg (per-session secrets)
