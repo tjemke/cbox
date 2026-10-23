@@ -33,7 +33,13 @@
             [
               microvm.nixosModules.microvm
               ./guest.nix
-              {nixpkgs.hostPlatform = pkgs.stdenv.hostPlatform.system;}
+              {
+                nixpkgs.hostPlatform = pkgs.stdenv.hostPlatform.system;
+                # QEMU and the rest of the runner run on the host, where QEMU
+                # is the boundary the box rests on, so they come from the
+                # host's packages whatever the guest is built from.
+                microvm.vmHostPackages = pkgs;
+              }
             ]
             ++ modules;
         };

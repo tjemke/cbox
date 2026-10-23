@@ -29,6 +29,8 @@ With the module, the guest is built from your system's own nixpkgs
 (`programs.cbox.guestNixpkgs = "host"`, the default), so every system update
 rebuilds the image along with it: new Nix daemon, kernel and claude-code.
 `"pinned"` uses cbox's `flake.lock` instead, as `nix run` of this flake does.
+QEMU and the rest of what cbox runs on the host always come from your system's
+packages, so they keep up with it whichever nixpkgs the guest is built from.
 Either way `cbox run` warns once the guest's nixpkgs is over 30 days old, since
 by then it has usually missed fixes for exactly what stands between the agent
 and guest root. The date comes from nixpkgs' flake; a channel-based host has
