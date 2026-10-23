@@ -149,7 +149,17 @@ in {
           agent's context.
         '';
       };
-      package = lib.mkPackageOption pkgs "rtk" {};
+      package = lib.mkOption {
+        type = lib.types.package;
+        default = pkgs.callPackage ./rtk-oss.nix {};
+        defaultText = lib.literalMD "this nixpkgs' rtk, built without its BUSL-1.1 engine (`rtk-oss.nix`)";
+        description = ''
+          The rtk to install. The default is the Apache-2.0 edition, rtk-oss,
+          which leaves out only the BUSL-1.1 compression engine cbox doesn't
+          use. For the full edition, set it to `pkgs.rtk` and add "rtk" to
+          `nixpkgs.config.allowUnfreePackages`.
+        '';
+      };
     };
     display = lib.mkOption {
       type = lib.types.str;

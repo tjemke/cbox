@@ -56,6 +56,16 @@ reaches the agent's context. `rtk gain` inside the box shows the savings. The
 hook only rewrites commands and never approves them, so auto mode's checks are
 unchanged. Turn it off with `cbox.rtk.enable = false;` in a guest module.
 
+Since 1.0, rtk's default build links a compression engine under BUSL-1.1, which
+nixpkgs counts as unfree. cbox installs the Apache-2.0 edition upstream ships as
+rtk-oss instead: the same rtk without the engine (`rtk-oss.nix`). It keeps the
+hook and every command filter, and drops only what cbox doesn't set up:
+compressing the output of the agent's Read and MCP tools, and pipelines. For
+the full edition, set `cbox.rtk.package = pkgs.rtk;` and
+`nixpkgs.config.allowUnfreePackages = ["rtk"];` in a guest module.
+cache.nixos.org has neither edition, so rtk is built locally, which takes a few
+minutes.
+
 The display has OpenGL, EGL and Vulkan, rendered on the CPU by Mesa's llvmpipe
 and lavapipe, so GUIs that need GL start there. Chrome blocklists llvmpipe and
 only uses it for WebGL with `--ignore-gpu-blocklist`. There is deliberately no

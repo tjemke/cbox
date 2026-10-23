@@ -43,7 +43,10 @@
     flake-utils.lib.eachSystem ["x86_64-linux" "aarch64-linux"] (system: let
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      packages.default = mkCbox {inherit pkgs;};
+      packages = {
+        default = mkCbox {inherit pkgs;};
+        rtk-oss = pkgs.callPackage ./rtk-oss.nix {};
+      };
       formatter = pkgs.alejandra;
     })
     // {
