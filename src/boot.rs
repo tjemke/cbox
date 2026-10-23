@@ -89,7 +89,7 @@ fn warn_if_stale() {
     if age > STALE_AFTER_DAYS {
         eprintln!("cbox: this box's nixpkgs is from {cut}, {age} days ago; its Nix daemon,");
         eprintln!("      kernel and claude-code lack every fix since. Update the nixpkgs input");
-        eprintln!("      it is built from and rebuild (see programs.cbox.guestNixpkgs).");
+        eprintln!("      it is built from and rebuild (see programs.cbox.image.nixpkgs).");
     }
 }
 

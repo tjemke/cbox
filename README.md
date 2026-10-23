@@ -13,7 +13,7 @@ inputs.cbox.url = "path:/path/to/cbox"; # or wherever you keep it
 imports = [inputs.cbox.nixosModules.default];
 programs.cbox = {
   enable = true;
-  guestModules = [
+  image.modules = [
     ({pkgs, ...}: {
       microvm.mem = 12288; # default 8192, vcpu 4
       environment.systemPackages = [pkgs.nodejs];
@@ -25,16 +25,18 @@ programs.cbox = {
 The first build makes an erofs image of the guest closure (Chrome, Chromium
 and Mesa included), so it takes a while and a few GB. Later sessions reuse it.
 
-With the module, the guest is built from your system's own nixpkgs
-(`programs.cbox.guestNixpkgs = "host"`, the default), so every system update
-rebuilds the image along with it: new Nix daemon, kernel and claude-code.
-`"pinned"` uses cbox's `flake.lock` instead, as `nix run` of this flake does.
-QEMU and the rest of what cbox runs on the host always come from your system's
-packages, so they keep up with it whichever nixpkgs the guest is built from.
-Either way `cbox run` warns once the guest's nixpkgs is over 30 days old, since
-by then it has usually missed fixes for exactly what stands between the agent
-and guest root. The date comes from nixpkgs' flake; a channel-based host has
-none, and gets no warning.
+With the module, the guest image is built from the nixpkgs your system is built
+from, so every system update rebuilds it along with it: new Nix daemon, kernel
+and claude-code. `programs.cbox.image.nixpkgs` takes any other nixpkgs instead,
+such as `inputs.nixpkgs-unstable` on a stable host, or
+`inputs.cbox.inputs.nixpkgs` for cbox's own `flake.lock`, which is what
+`nix run` of this flake uses. QEMU and the rest of what cbox runs on the host
+always come from your system's packages, so they keep up with it whichever
+nixpkgs the guest is built from. `cbox run` warns once the guest's nixpkgs is
+over 30 days old, since by then it has usually missed fixes for exactly what
+stands between the agent and guest root. The date comes from nixpkgs' flake,
+the input's own or your system's; a channel-based host has none, and gets no
+warning.
 
 claude-code releases faster than nixpkgs follows. To run a newer one without
 moving the rest of the box, set `cbox.claudeCode.package` in a guest module,
