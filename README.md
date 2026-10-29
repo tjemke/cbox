@@ -99,6 +99,17 @@ box's `~/.claude/settings.json` (lists, such as hooks, add up with rtk's):
 image.modules = [{cbox.claudeCode.settings.model = "opus";}];
 ```
 
+`persist.project`: sessions, kept in the project. With
+`cbox.persist.project.sessions = true;` in a guest module, Claude Code's
+transcripts, project memory, todos, plans, `/rewind` checkpoints and prompt
+history live in `.cbox/` in the shared directory, so the next box on that
+directory can `claude --continue` or `--resume`.
+`cbox.persist.project.shellHistory = true;` keeps bash history there too, and
+`cbox.persist.project.dir` moves it. The directory ignores itself in git. This
+adds no new way from one box to the next, since the agent can already write
+anything in the shared directory, but transcripts hold whatever the agent saw,
+so treat `.cbox/` like a log.
+
 ## What the agent can reach
 
 Files: only the shared directory, through an unprivileged virtiofsd in its

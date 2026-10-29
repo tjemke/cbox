@@ -68,8 +68,59 @@
       and the network. A derivation that builds here may still be impure;
       say so rather than claiming it is reproducible.
   '';
+  # cbox.persist.project: per-project state in the shared directory, under
+  # /work/<dir>. Paths are relative to ~/.claude, mirrored there.
+  persistedClaude = lib.optionals cfg.persist.project.sessions [
+    "projects/-work" # transcripts, and the project's auto-memory
+    "file-history" # checkpoints behind /rewind
+    "todos"
+    "plans"
+  ];
+  persistingProject = cfg.persist.project.sessions || cfg.persist.project.shellHistory;
+  persistProjectDir = "/work/${cfg.persist.project.dir}";
+
+  # Runs as the agent, never as root: everything under /work is the agent's
+  # to plant symlinks in, and root following one would write wherever it
+  # pointed.
+  persistProjectSetup = pkgs.writeShellScript "cbox-persist-project" ''
+    set -eu
+    d=${persistProjectDir}
+    c=/home/agent/.claude
+    mkdir -p "$d"
+    # Transcripts and history can hold anything the agent saw; keep them
+    # out of commits without touching the project's own .gitignore.
+    [ -e "$d/.gitignore" ] || printf '*\n' > "$d/.gitignore"
+    ${lib.concatMapStrings (p: ''
+        mkdir -p "$d/claude/${p}" "$(dirname "$c/${p}")"
+        ln -sfn "$d/claude/${p}" "$c/${p}"
+      '')
+      persistedClaude}
+    ${lib.optionalString cfg.persist.project.sessions ''
+      # The up-arrow history. One file shared by every project on a normal
+      # install; every box sees only /work, so it is per project here.
+      touch "$d/claude/history.jsonl"
+      ln -sfn "$d/claude/history.jsonl" "$c/history.jsonl"
+    ''}
+  '';
+
+  # One bullet, wrapped like the rest of CLAUDE.md.
+  persistNotes =
+    lib.concatStringsSep "\n  " (
+      [
+        "- ${persistProjectDir} carries state over to the next box on this directory,"
+        "and ignores itself in git."
+      ]
+      ++ lib.optionals cfg.persist.project.sessions [
+        "Claude Code's sessions are kept there: `claude --continue` and"
+        "`--resume` find earlier boxes' transcripts, and project memory"
+        "carries over."
+      ]
+      ++ lib.optional cfg.persist.project.shellHistory "Bash history is kept there."
+    )
+    + "\n";
   agentNotes = pkgs.writeText "cbox-CLAUDE.md" (
     baseNotes
+    + lib.optionalString persistingProject persistNotes
     + lib.optionalString config.hardware.graphics.enable graphicsNotes
     + lib.optionalString cfg.kvm kvmNotes
     + lib.optionalString (!cfg.nixSandbox) sandboxNotes
@@ -161,6 +212,35 @@ in {
           use. For the full edition, set it to `pkgs.rtk` and add "rtk" to
           `nixpkgs.config.allowUnfreePackages`.
         '';
+      };
+    };
+    persist.project = {
+      dir = lib.mkOption {
+        # One path component, and not "." or "..".
+        type = lib.types.strMatching "[.]?[A-Za-z0-9_-][A-Za-z0-9._-]*";
+        default = ".cbox";
+        description = ''
+          Where in the shared directory the other `persist.project` options
+          keep their state. It is created on first use, with a .gitignore
+          that ignores everything in it.
+        '';
+      };
+      sessions = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = ''
+          Keep Claude Code's transcripts, project memory, todos, plans,
+          /rewind checkpoints and prompt history in the shared directory, so
+          the next box on it can `claude --continue` or `--resume`. The agent
+          could already write anything there for the next box to read, so
+          this adds no new way across; but transcripts hold whatever the
+          agent saw, the session's environment included if it printed it.
+        '';
+      };
+      shellHistory = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Keep bash history in the shared directory.";
       };
     };
     display = lib.mkOption {
@@ -414,8 +494,16 @@ in {
           kitty.terminfo
         ]
         ++ lib.optional cfg.rtk.enable cfg.rtk.package;
-      variables.DISPLAY = ":99";
+      variables =
+        {DISPLAY = ":99";}
+        // lib.optionalAttrs cfg.persist.project.shellHistory {
+          HISTFILE = "${persistProjectDir}/bash_history";
+          HISTFILESIZE = "100000";
+          HISTSIZE = "100000";
+        };
     };
+    # Several shells (cbox attach) append rather than overwrite each other.
+    programs.bash.interactiveShellInit = lib.mkIf cfg.persist.project.shellHistory "shopt -s histappend";
     documentation.enable = false;
 
     # Mesa at /run/opengl-driver, the one place Xvfb's GLX and libglvnd look
@@ -496,6 +584,13 @@ in {
             mount --bind "$g" "$g"
             mount -o remount,bind,ro "$g"
           fi
+
+          # A convenience, not a protection, so it fails open: a box that
+          # can't keep its state still starts.
+          ${lib.optionalString persistingProject ''
+            runuser -u agent -- ${persistProjectSetup} \
+              || echo "cbox-setup: could not set up ${persistProjectDir}" >&2
+          ''}
 
           touch /run/cbox/ready
         '';
