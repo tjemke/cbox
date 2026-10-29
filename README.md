@@ -88,6 +88,17 @@ Options: `--git rw` (let the agent commit, see below), `--lan` (allow private
 addresses), `--env NAME` (pass another host variable), `--keep` (keep the
 session dir and logs in `$XDG_RUNTIME_DIR/cbox/<id>` for debugging).
 
+## Keeping state between boxes
+
+Nothing carries over by default. Everything below is opt-in.
+
+Settings every box starts with, declared in a guest module and merged into the
+box's `~/.claude/settings.json` (lists, such as hooks, add up with rtk's):
+
+```nix
+image.modules = [{cbox.claudeCode.settings.model = "opus";}];
+```
+
 ## What the agent can reach
 
 Files: only the shared directory, through an unprivileged virtiofsd in its

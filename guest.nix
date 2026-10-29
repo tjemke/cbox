@@ -84,27 +84,6 @@
     ${lib.getExe cfg.rtk.package} init -g --auto-patch > /dev/null
     cp "$HOME/.claude/RTK.md" "$out"
   '';
-
-  claudeSettings =
-    lib.optionalAttrs (cfg.claudeDefaultMode != null) {
-      permissions.defaultMode = cfg.claudeDefaultMode;
-    }
-    // lib.optionalAttrs cfg.rtk.enable {
-      # Same hook `rtk init -g` registers, by store path. It only rewrites
-      # the command (`git status` -> `rtk git status`) and never returns a
-      # permission decision, so auto mode still judges every call.
-      hooks.PreToolUse = [
-        {
-          matcher = "Bash";
-          hooks = [
-            {
-              type = "command";
-              command = "${lib.getExe cfg.rtk.package} hook claude";
-            }
-          ];
-        }
-      ];
-    };
 in {
   options.cbox = {
     claudeDefaultMode = lib.mkOption {
@@ -115,11 +94,27 @@ in {
         Claude Code only honours "auto" from user settings. null leaves it unset.
       '';
     };
-    claudeCode.package = lib.mkPackageOption pkgs "claude-code" {
-      extraDescription = ''
-        It moves fast and nixpkgs lags behind, so this is the one to take from
-        a newer nixpkgs without moving the rest of the box along.
-      '';
+    claudeCode = {
+      package = lib.mkPackageOption pkgs "claude-code" {
+        extraDescription = ''
+          It moves fast and nixpkgs lags behind, so this is the one to take from
+          a newer nixpkgs without moving the rest of the box along.
+        '';
+      };
+      settings = lib.mkOption {
+        type = (pkgs.formats.json {}).type;
+        default = {};
+        example = {
+          model = "opus";
+          includeCoAuthoredBy = false;
+        };
+        description = ''
+          The guest's ~/.claude/settings.json, seeded fresh into every box.
+          Definitions from several modules merge, lists included, so a hook
+          defined here runs alongside rtk's. `claudeDefaultMode` and rtk's
+          hook are set through this too.
+        '';
+      };
     };
     nixSandbox = lib.mkOption {
       type = lib.types.bool;
@@ -176,6 +171,28 @@ in {
   };
 
   config = {
+    cbox.claudeCode.settings = lib.mkMerge [
+      (lib.mkIf (cfg.claudeDefaultMode != null) {
+        permissions.defaultMode = cfg.claudeDefaultMode;
+      })
+      (lib.mkIf cfg.rtk.enable {
+        # Same hook `rtk init -g` registers, by store path. It only rewrites
+        # the command (`git status` -> `rtk git status`) and never returns a
+        # permission decision, so auto mode still judges every call.
+        hooks.PreToolUse = [
+          {
+            matcher = "Bash";
+            hooks = [
+              {
+                type = "command";
+                command = "${lib.getExe cfg.rtk.package} hook claude";
+              }
+            ];
+          }
+        ];
+      })
+    ];
+
     system.stateVersion = lib.trivial.release; # nothing persists, so no migration concerns
     networking.hostName = "cbox";
     # A list rather than allowUnfreePredicate: lists from several modules add
@@ -498,11 +515,11 @@ in {
       };
       "/home/agent/.claude/CLAUDE.md"."L+".argument = "${agentNotes}";
       "/home/agent/.claude/RTK.md" = lib.mkIf cfg.rtk.enable {"L+".argument = "${rtkNotes}";};
-      "/home/agent/.claude/settings.json".f = lib.mkIf (claudeSettings != {}) {
+      "/home/agent/.claude/settings.json".f = lib.mkIf (cfg.claudeCode.settings != {}) {
         mode = "0600";
         user = "agent";
         group = "users";
-        argument = builtins.toJSON claudeSettings;
+        argument = builtins.toJSON cfg.claudeCode.settings;
       };
       # Best effort: skips first-run onboarding and the /work trust prompt.
       "/home/agent/.claude.json".f = {
