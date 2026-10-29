@@ -173,7 +173,7 @@ out.
 ## Status
 
 Evaluated, not booted: the whole closure instantiates for x86_64 and aarch64
-against nixos-unstable, the host module evaluates, and the host CLI (`src/`,
+against nixos-unstable, the host module evaluates, and the host CLI (`crates/`,
 Rust + clap) builds clean under `cargo clippy -- -D warnings` with its unit
 tests passing. No KVM was available to boot a real guest. If the first boot
 misbehaves, run with `--keep` and read `console.log`, `virtiofsd.log` and

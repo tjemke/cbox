@@ -1,0 +1,13 @@
+[package]
+name = "cbox"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Ephemeral NixOS microVMs for coding agents, with a headed browser"
+
+[dependencies]
+anyhow.workspace = true
+clap = { version = "4", features = ["derive"] }
+jiff = "0.2.38"
+libc = "0.2"
+signal-hook = "0.3"

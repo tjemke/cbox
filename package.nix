@@ -15,7 +15,7 @@
 in
   rustPlatform.buildRustPackage {
     pname = "cbox";
-    version = (lib.importTOML ./Cargo.toml).package.version;
+    version = (lib.importTOML ./Cargo.toml).workspace.package.version;
 
     # Only the Rust sources, so editing guest.nix doesn't rebuild the binary.
     src = lib.fileset.toSource {
@@ -23,7 +23,7 @@ in
       fileset = lib.fileset.unions [
         ./Cargo.toml
         ./Cargo.lock
-        ./src
+        ./crates
       ];
     };
     cargoLock.lockFile = ./Cargo.lock;

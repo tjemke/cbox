@@ -1,16 +1,14 @@
-[package]
-name = "cbox"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "Ephemeral NixOS microVMs for coding agents, with a headed browser"
 license = "MIT"
 
-[dependencies]
+[workspace.dependencies]
 anyhow = "1"
-clap = { version = "4", features = ["derive"] }
-jiff = "0.2.38"
-libc = "0.2"
-signal-hook = "0.3"
 
 [profile.release]
 opt-level = "s"
