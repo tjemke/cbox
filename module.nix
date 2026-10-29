@@ -68,10 +68,46 @@ in {
         description = "Extra NixOS modules for the guest image (packages, `microvm.mem`/`vcpu`, `cbox.*`).";
       };
     };
+    # Per-project persistence is the guest's cbox.persist.project, set in
+    # image.modules: it lives in the shared directory and needs nothing from
+    # the host. This is the part the host has to enforce.
+    persist.global = {
+      settings = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [];
+        example = ["model" "outputStyle" "alwaysThinkingEnabled"];
+        description = ''
+          Top-level keys of the guest's ~/.claude/settings.json to carry from
+          one box to every later one, whatever its project: `model` makes a
+          `/model` choice stick. When a box's session ends, cbox reads these
+          keys out of it and keeps them in
+          `$XDG_STATE_HOME/cbox/persist-global.json`; later boxes start with
+          them on top of `cbox.claudeCode.settings`. Only
+          string, number and boolean values are kept, so nothing that holds
+          hooks, MCP servers, plugins or environment variables can come
+          across, and keys whose string is a command (`apiKeyHelper`) are
+          refused. Listing any key here or in `claudeJson` builds cbox with
+          its `persist-global` feature, which links the cbox-persist-global
+          crate (about 250 lines) and serde_json; without it, neither is
+          built.
+        '';
+      };
+      claudeJson = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [];
+        example = ["theme" "editorMode" "hasSeenAutoModeEntryWarning"];
+        description = ''
+          The same, for top-level keys of the guest's ~/.claude.json, where
+          Claude Code keeps `/config` choices such as `theme` and
+          `editorMode`, and which notices have been seen.
+        '';
+      };
+    };
     package = lib.mkOption {
       type = lib.types.package;
       default = mkCbox {
         inherit pkgs;
+        inherit (cfg) persist;
         image =
           {inherit (cfg.image) nixpkgs modules;}
           # This system's nixpkgs is a plain path, without the date a flake
@@ -80,7 +116,7 @@ in {
             nixpkgsDate = hostNixpkgsDate;
           };
       };
-      defaultText = lib.literalExpression "cbox built from programs.cbox.image";
+      defaultText = lib.literalExpression "cbox built from programs.cbox.image and programs.cbox.persist";
       description = "The cbox package.";
     };
   };

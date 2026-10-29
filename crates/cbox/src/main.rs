@@ -10,10 +10,15 @@
 //! - [`proc`]: child processes and the signals that cut them short
 //! - [`boot`]: `cbox run`, which creates a box
 //! - [`commands`]: the verbs that work on a box you already have
+//! - `persist_global`: carrying chosen Claude Code settings to later boxes,
+//!   with the `persist-global` feature only (the work is in
+//!   crates/cbox-persist-global)
 
 mod boot;
 mod commands;
 mod cred;
+#[cfg(feature = "persist-global")]
+mod persist_global;
 mod proc;
 mod session;
 mod ssh;

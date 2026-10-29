@@ -24,6 +24,11 @@
       # day that tree was cut (YYYYMMDD, or null if unknown), which `cbox run`
       # warns about once it is old; a flake input brings its own.
       image ? {},
+      # What carries over from one box to later ones, as programs.cbox.persist
+      # describes. Only `global` is host-side: `settings` and `claudeJson`,
+      # lists of top-level keys. Per-project persistence is a guest option,
+      # cbox.persist.project, so it goes in `image.modules`.
+      persist ? {},
     }: let
       guestNixpkgs = image.nixpkgs or nixpkgs;
       guestNixpkgsDate =
@@ -47,6 +52,7 @@
     in
       pkgs.callPackage ./package.nix {
         inherit guestNixpkgsDate;
+        persistGlobal = persist.global or {};
         guest = import (guestNixpkgsSource + "/nixos/lib/eval-config.nix") {
           system = null; # from nixpkgs.hostPlatform below
           modules =

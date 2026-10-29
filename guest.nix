@@ -103,6 +103,24 @@
     ''}
   '';
 
+  # Settings kept from earlier boxes (programs.cbox.persist.global), merged
+  # over the seeded ones. The host only hands over listed keys with scalar
+  # values, keyed by file, so a shallow merge is all this needs. As the agent,
+  # for the same reason as cbox-persist-project: its home is its own.
+  persistGlobalSetup = pkgs.writeShellScript "cbox-persist-global" ''
+    set -eu
+    # Read from stdin, not /dev/stdin: the pipe is root's, and reopening
+    # it by path is refused once runuser has dropped to the agent.
+    kept=$(cat)
+    for f in .claude/settings.json .claude.json; do
+      p=/home/agent/$f
+      [ -e "$p" ] || printf '{}\n' > "$p"
+      ${lib.getExe pkgs.jaq} --arg f "$f" --argjson r "$kept" \
+        '. + ($r[$f] // {})' "$p" > "$p.new"
+      mv "$p.new" "$p"
+    done
+  '';
+
   # One bullet, wrapped like the rest of CLAUDE.md.
   persistNotes =
     lib.concatStringsSep "\n  " (
@@ -585,8 +603,12 @@ in {
             mount -o remount,bind,ro "$g"
           fi
 
-          # A convenience, not a protection, so it fails open: a box that
-          # can't keep its state still starts.
+          # Conveniences, not protections, so these fail open: a box that
+          # can't restore its state still starts.
+          if has persist-global; then
+            cred persist-global | runuser -u agent -- ${persistGlobalSetup} \
+              || echo "cbox-setup: could not restore settings from earlier boxes" >&2
+          fi
           ${lib.optionalString persistingProject ''
             runuser -u agent -- ${persistProjectSetup} \
               || echo "cbox-setup: could not set up ${persistProjectDir}" >&2

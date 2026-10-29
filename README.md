@@ -110,6 +110,34 @@ adds no new way from one box to the next, since the agent can already write
 anything in the shared directory, but transcripts hold whatever the agent saw,
 so treat `.cbox/` like a log.
 
+`persist.global`: chosen settings, kept on the host for every later box,
+whatever its project. `programs.cbox.persist.global` lists top-level keys of
+the guest's `~/.claude/settings.json` and `~/.claude.json` to carry over, so a
+`/model` or `/config` choice made in one box sticks:
+
+```nix
+programs.cbox.persist.global = {
+  settings = ["model"];                     # what /model sets
+  claudeJson = ["theme" "editorMode"];      # what /config sets
+};
+```
+
+When a box's session ends, cbox reads those keys out of the box and keeps them
+in `$XDG_STATE_HOME/cbox/persist-global.json` (default `~/.local/state`); later
+boxes get them through fw_cfg, on top of `cbox.claudeCode.settings`. Only what
+changed in a box is written back, so two boxes don't undo each other. Unlike
+`persist.project`, this is a new channel between boxes on unrelated projects,
+into files Claude Code takes hooks and helper commands from, so the host
+filters on the way out: listed keys only, string/number/boolean values only,
+and keys that hold a command even as a string (`apiKeyHelper` and the like) are
+refused at build time. That is also why it is a host option and the other a
+guest one: the filter has to run where the agent can't reach it. It is the
+only part with Rust behind it: listing any key builds cbox with its
+`persist-global` feature, which links the `cbox-persist-global` crate
+(`crates/cbox-persist-global`) and serde_json. Without it, the binary has
+neither. With `mkCbox`, pass
+`persist.global = {settings = [...]; claudeJson = [...];}`.
+
 ## What the agent can reach
 
 Files: only the shared directory, through an unprivileged virtiofsd in its

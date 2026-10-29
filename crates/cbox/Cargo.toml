@@ -11,3 +11,10 @@ clap = { version = "4", features = ["derive"] }
 jiff = "0.2.38"
 libc = "0.2"
 signal-hook = "0.3"
+cbox-persist-global = { path = "../cbox-persist-global", optional = true }
+
+[features]
+# Carry chosen Claude Code settings from one box to the next (crates/cbox-persist-global).
+# Off by default; the Nix package turns it on when programs.cbox.persist.global lists
+# any keys, so a plain cbox has neither that crate nor a JSON parser in it.
+persist-global = ["dep:cbox-persist-global"]

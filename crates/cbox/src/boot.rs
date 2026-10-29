@@ -55,6 +55,8 @@ pub fn run(a: RunArgs) -> Result<ExitCode> {
     let id = session::id_for(&dir)?;
     let mut sess = Session::create(&id, &dir, runner.clone(), a.keep)?;
     cred::write(&sess.run, a.git, a.lan, &pass_env)?;
+    #[cfg(feature = "persist-global")]
+    let given = crate::persist_global::hand_over(&sess.run)?;
 
     start_helpers(&mut sess, &dir)?;
     sess.qemu = Some(spawn_logged(
@@ -69,6 +71,8 @@ pub fn run(a: RunArgs) -> Result<ExitCode> {
 
     let mut ssh = ssh::interactive(&sess.run, &a.cmd)?;
     let status = wait_foreground(ssh.spawn().context("starting ssh")?)?;
+    #[cfg(feature = "persist-global")]
+    crate::persist_global::take_back(&mut sess, given);
     Ok(exit_code(status))
     // Returning drops `sess`, which shuts the box down and removes it.
 }
